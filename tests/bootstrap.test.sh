@@ -94,11 +94,12 @@ check "without jq it stops, and runs nothing" "no jq|" \
 echo "bootstrap.sh: the command on the PATH"
 
 mkdir -p "$tmp/install/bin"
-printf '#!/bin/sh\necho plugin-launcher "$@"\n' >"$tmp/install/bin/neoarchivist" && chmod +x "$tmp/install/bin/neoarchivist"
+printf '#!/bin/sh\necho plugin-launcher "$@"; echo "$@" >>"%s"\n' "$tmp/launches" >"$tmp/install/bin/neoarchivist" && chmod +x "$tmp/install/bin/neoarchivist"
 fake '[]' "[{\"id\":\"neoarchivist@neoarchivist\",\"scope\":\"user\",\"installPath\":\"$tmp/install\"}]"
 run >/dev/null
 check "it points ~/.local/bin/neoarchivist at the installed plugin" "plugin-launcher check --staged" \
   "$("$HOME/.local/bin/neoarchivist" check --staged)"
+check "after the launcher fetched the binary, once" "--version" "$(head -n 1 "$tmp/launches")"
 fake '[]' '[]'
 rm -f "$HOME/.local/bin/neoarchivist"
 run >/dev/null

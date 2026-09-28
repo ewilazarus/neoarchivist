@@ -9,8 +9,10 @@
 # opens the project is offered them. --dry-run prints the commands without running them.
 #
 # It adds the two marketplaces, then installs neoarchivist, which brings obsidian along, or
-# updates it if it's already there, so it is safe to run again. It also puts `neoarchivist`
-# in ~/.local/bin, for the git checks `/neoarchivist:init --checks` sets up. Then run
+# updates it if it's already there, so it is safe to run again. It then downloads the
+# plugin's neoarchivist binary from the GitHub release matching its version, so nothing
+# waits for it later, and puts `neoarchivist` in ~/.local/bin, for the git checks
+# `/neoarchivist:init --checks` sets up. Then run
 # /neoarchivist:init in a project. Needs the `claude` CLI, git and jq.
 
 set -euo pipefail
@@ -113,6 +115,12 @@ link_cli() {
     return 0
   fi
   mkdir -p "$(dirname "$target")"
+  # The launcher downloads and checks the release matching the plugin's version, once.
+  if ! version=$("$install/bin/neoarchivist" --version </dev/null); then
+    warn "Couldn't download the neoarchivist binary. The plugin retries when it's first needed."
+    return 0
+  fi
+  say "Downloaded $version."
   printf '#!/bin/sh\nexec "%s/bin/neoarchivist" "$@"\n' "$install" >"$target"
   chmod +x "$target"
   say "neoarchivist is on your PATH at $target."

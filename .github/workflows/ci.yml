@@ -1,0 +1,47 @@
+name: ci
+
+# Format, clippy, the unit tests, and the bash suite that specifies every command. The
+# suite runs on macOS under bash 3.2 and bash 5 with the system's BSD tools, and on Ubuntu
+# with GNU tools and mawk, since users' git hooks and the plugin's launcher run there.
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - run: cargo fmt --check
+      - run: cargo clippy --all-targets -- -D warnings
+
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            bash: /bin/bash
+          - os: macos-latest
+            bash: bash
+          - os: ubuntu-latest
+            bash: bash
+    runs-on: ${{ matrix.os }}
+    name: test (${{ matrix.os }}, ${{ matrix.bash }})
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@stable
+      - run: cargo test
+      - name: The command suite
+        # Resolve the shell first, so bash 5 stays bash 5 once /usr/bin comes first, and
+        # keep macOS on its own BSD tools rather than Homebrew's GNU ones. Cargo stays
+        # reachable further down the PATH.
+        run: |
+          shell=$(command -v ${{ matrix.bash }})
+          if [ "$RUNNER_OS" = macOS ]; then export PATH="/usr/bin:/bin:/usr/sbin:/sbin:$PATH"; fi
+          "$shell" --version | head -n 1
+          "$shell" tests/run.sh

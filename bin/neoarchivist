@@ -1,0 +1,51 @@
+#!/bin/sh
+# Runs the neoarchivist binary that matches this plugin's version.
+#
+# A checkout built with cargo runs its own build, as when Claude Code loads the plugin from
+# a local folder. Otherwise the release for this version is downloaded once, checked
+# against its published sha256, and cached in ${XDG_CACHE_HOME:-~/.cache}/neoarchivist/.
+# If that fails, this exits 1, which a hook reports as a non-blocking error.
+
+set -eu
+
+root=$(cd "$(dirname "$0")/.." && pwd)
+for built in "$root/target/debug/neoarchivist" "$root/target/release/neoarchivist"; do
+  [ -x "$built" ] && exec "$built" "$@"
+done
+
+version=$(sed -n 's/^  "version": "\(.*\)",$/\1/p' "$root/.claude-plugin/plugin.json" | head -n 1)
+cache="${XDG_CACHE_HOME:-$HOME/.cache}/neoarchivist"
+bin="$cache/neoarchivist-$version"
+
+fetch() {
+  case "$(uname -s)-$(uname -m)" in
+    Darwin-arm64) target=aarch64-apple-darwin ;;
+    Darwin-x86_64) target=x86_64-apple-darwin ;;
+    Linux-x86_64) target=x86_64-unknown-linux-musl ;;
+    Linux-aarch64 | Linux-arm64) target=aarch64-unknown-linux-musl ;;
+    *) echo "neoarchivist: there is no build for $(uname -s) $(uname -m)" >&2; return 1 ;;
+  esac
+  url="https://github.com/ewilazarus/neoarchivist/releases/download/v$version/neoarchivist-$target.tar.gz"
+  tmp=$(mktemp -d)
+  if ! curl -fsSL "$url" -o "$tmp/archive.tar.gz" || ! curl -fsSL "$url.sha256" -o "$tmp/archive.sha256"; then
+    echo "neoarchivist: couldn't download $url" >&2
+    rm -rf "$tmp"
+    return 1
+  fi
+  want=$(cut -d ' ' -f 1 <"$tmp/archive.sha256")
+  have=$({ shasum -a 256 "$tmp/archive.tar.gz" 2>/dev/null || sha256sum "$tmp/archive.tar.gz"; } | cut -d ' ' -f 1)
+  if [ "$want" != "$have" ]; then
+    echo "neoarchivist: $url doesn't match its published sha256" >&2
+    rm -rf "$tmp"
+    return 1
+  fi
+  tar -xzf "$tmp/archive.tar.gz" -C "$tmp" neoarchivist
+  mkdir -p "$cache"
+  mv "$tmp/neoarchivist" "$bin.$$"
+  chmod +x "$bin.$$"
+  mv "$bin.$$" "$bin"
+  rm -rf "$tmp"
+}
+
+[ -x "$bin" ] || fetch
+exec "$bin" "$@"

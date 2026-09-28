@@ -1,0 +1,24 @@
+{
+  "name": "neoarchivist",
+  "description": "neoarchivist: a project's Obsidian vault, kept by one agent.",
+  "owner": {
+    "name": "ewilazarus"
+  },
+  "allowCrossMarketplaceDependenciesOn": [
+    "obsidian-skills"
+  ],
+  "plugins": [
+    {
+      "name": "neoarchivist",
+      "source": "./",
+      "description": "Keeps a project's Obsidian vault behind one agent, neoarchivist:agent, so the main conversation's context stays free: Claude sends it JSON requests to look things up or record work, checked by hooks against a contract. The vault keeps notes on what is true now, a daily memo of what happened with plain follow-up checkboxes, and a decision note for each choice worth explaining. Commands: init, ask, record, todos, lint, graph and preset. Requires kepano/obsidian-skills.",
+      "version": "0.1.0",
+      "dependencies": [
+        {
+          "name": "obsidian",
+          "marketplace": "obsidian-skills"
+        }
+      ]
+    }
+  ]
+}
